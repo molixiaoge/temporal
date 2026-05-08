@@ -21,6 +21,7 @@ import (
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/common/testing/protoassert"
+	"go.temporal.io/server/common/testing/protorequire"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -127,6 +128,34 @@ func TestGetNotFound(t *testing.T) {
 	reg.dataLock.RLock()
 	defer reg.dataLock.RUnlock()
 	assert.Equal(t, int64(1), reg.tableVersion)
+}
+
+func TestGetByNameRefreshOnRead(t *testing.T) {
+	t.Parallel()
+
+	testEntry := newEndpointEntry(t.Name())
+	mocks := newTestMocks(t)
+	mocks.config.refreshOnRead = dynamicconfig.GetBoolPropertyFn(true)
+
+	mocks.matchingClient.EXPECT().ListNexusEndpoints(gomock.Any(), &matchingservice.ListNexusEndpointsRequest{
+		PageSize:              int32(100),
+		LastKnownTableVersion: int64(0),
+		Wait:                  false,
+	}).Return(&matchingservice.ListNexusEndpointsResponse{
+		Entries:      []*persistencespb.NexusEndpointEntry{testEntry},
+		TableVersion: int64(2),
+	}, nil)
+
+	reg := NewEndpointRegistry(mocks.config, mocks.matchingClient, mocks.persistence, log.NewNoopLogger(), metrics.NoopMetricsHandler)
+	markEndpointRegistryInitialized(reg)
+
+	endpoint, err := reg.GetByName(context.Background(), "ignored", testEntry.Endpoint.Spec.Name)
+	require.NoError(t, err)
+	protorequire.ProtoEqual(t, testEntry, endpoint)
+
+	reg.dataLock.RLock()
+	defer reg.dataLock.RUnlock()
+	require.Equal(t, int64(2), reg.tableVersion)
 }
 
 func TestInitializationFallback(t *testing.T) {
@@ -308,6 +337,12 @@ func newTestMocks(t *testing.T) *testMocks {
 		matchingClient: matchingservicemock.NewMockMatchingServiceClient(ctrl),
 		persistence:    persistence.NewMockNexusEndpointManager(ctrl),
 	}
+}
+
+func markEndpointRegistryInitialized(reg *EndpointRegistryImpl) {
+	ready := make(chan struct{})
+	close(ready)
+	reg.dataReady.Store(&dataReady{ready: ready})
 }
 
 func newEndpointEntry(name string) *persistencespb.NexusEndpointEntry {

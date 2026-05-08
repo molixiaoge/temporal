@@ -959,6 +959,11 @@ and deployment interaction in matching and history.`,
 		1*time.Second,
 		`RefreshNexusEndpointsMinWait is the minimum wait time between background long poll requests to update Nexus endpoints.`,
 	)
+	RefreshNexusEndpointsOnReadForTest = NewGlobalBoolSetting(
+		"system.refreshNexusEndpointsOnReadForTest",
+		false,
+		`RefreshNexusEndpointsOnReadForTest forces the Nexus endpoint registry to refresh from matching service on GetByName reads for tests.`,
+	)
 	NexusReadThroughCacheSize = NewGlobalIntSetting(
 		"system.nexusReadThroughCacheSize",
 		100,
