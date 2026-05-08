@@ -21,6 +21,7 @@ import (
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
 	p "go.temporal.io/server/common/persistence"
+	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/util"
 )
 
@@ -30,6 +31,7 @@ type (
 		refreshPageSize        dynamicconfig.IntPropertyFn
 		refreshMinWait         dynamicconfig.DurationPropertyFn
 		refreshRetryPolicy     backoff.RetryPolicy
+		refreshOnRead          bool
 		readThroughCacheSize   dynamicconfig.IntPropertyFn
 		readThroughCacheTTL    dynamicconfig.DurationPropertyFn
 	}
@@ -71,11 +73,15 @@ type (
 
 var ErrNexusDisabled = serviceerror.NewFailedPrecondition("nexus is disabled")
 
-func NewEndpointRegistryConfig(dc *dynamicconfig.Collection) *EndpointRegistryConfig {
+func NewEndpointRegistryConfig(
+	dc *dynamicconfig.Collection,
+	topology primitives.ServiceTopology,
+) *EndpointRegistryConfig {
 	config := &EndpointRegistryConfig{
 		refreshLongPollTimeout: dynamicconfig.RefreshNexusEndpointsLongPollTimeout.Get(dc),
 		refreshPageSize:        dynamicconfig.NexusEndpointListDefaultPageSize.Get(dc),
 		refreshMinWait:         dynamicconfig.RefreshNexusEndpointsMinWait.Get(dc),
+		refreshOnRead:          topology == primitives.ServiceTopologySingleProcess,
 		readThroughCacheSize:   dynamicconfig.NexusReadThroughCacheSize.Get(dc),
 		readThroughCacheTTL:    dynamicconfig.NexusReadThroughCacheTTL.Get(dc),
 	}
@@ -148,6 +154,15 @@ func (r *EndpointRegistryImpl) GetByName(ctx context.Context, _ namespace.ID, en
 	if err := r.waitUntilInitialized(ctx); err != nil {
 		return nil, err
 	}
+
+	if r.config.refreshOnRead {
+		// Force a fresh read instead of waiting for the background long-poll refresh
+		// when callers need endpoint writes to be visible immediately.
+		if err := r.loadEndpoints(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	r.dataLock.RLock()
 	endpoint, ok := r.endpointsByName[endpointName]
 	r.dataLock.RUnlock()

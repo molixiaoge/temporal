@@ -18,6 +18,7 @@ import (
 	commonnexus "go.temporal.io/server/common/nexus"
 	"go.temporal.io/server/common/nexus/nexusrpc"
 	"go.temporal.io/server/common/persistence"
+	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/rpc"
 	"go.uber.org/fx"
@@ -68,11 +69,12 @@ func register(
 func endpointRegistryProvider(
 	matchingClient resource.MatchingClient,
 	endpointManager persistence.NexusEndpointManager,
+	topology primitives.ServiceTopology,
 	dc *dynamicconfig.Collection,
 	logger log.Logger,
 	metricsHandler metrics.Handler,
 ) commonnexus.EndpointRegistry {
-	registryConfig := commonnexus.NewEndpointRegistryConfig(dc)
+	registryConfig := commonnexus.NewEndpointRegistryConfig(dc, topology)
 	return commonnexus.NewEndpointRegistry(
 		registryConfig,
 		matchingClient,

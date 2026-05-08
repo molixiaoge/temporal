@@ -670,7 +670,18 @@ func (c *TemporalImpl) startWorker() {
 }
 
 func (c *TemporalImpl) getFxOptionsForService(serviceName primitives.ServiceName) fx.Option {
-	return fx.Options(c.serviceFxOptions[serviceName]...)
+	return fx.Options(
+		fx.Provide(c.serviceNames, temporal.ServiceTopologyProvider),
+		fx.Options(c.serviceFxOptions[serviceName]...),
+	)
+}
+
+func (c *TemporalImpl) serviceNames() map[primitives.ServiceName]struct{} {
+	serviceNames := make(map[primitives.ServiceName]struct{}, len(c.hostsByProtocolByService[grpcProtocol]))
+	for serviceName := range c.hostsByProtocolByService[grpcProtocol] {
+		serviceNames[serviceName] = struct{}{}
+	}
+	return serviceNames
 }
 
 func (c *TemporalImpl) createSystemNamespace() error {

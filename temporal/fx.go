@@ -451,6 +451,9 @@ func (params ServiceProviderParamsCommon) GetCommonServiceOptions(serviceName pr
 			func() tasks.TaskCategoryRegistry {
 				return params.TaskCategoryRegistry
 			},
+			func() primitives.ServiceTopology {
+				return ServiceTopologyProvider(params.ServiceNames)
+			},
 		),
 		ServiceTracingModule,
 		resource.DefaultOptions,
@@ -458,6 +461,10 @@ func (params ServiceProviderParamsCommon) GetCommonServiceOptions(serviceName pr
 		FxLogAdapter,
 		ChasmLibraryOptions,
 	)
+}
+
+func ServiceTopologyProvider(serviceNames map[primitives.ServiceName]struct{}) primitives.ServiceTopology {
+	return primitives.NewServiceTopology(serviceNames)
 }
 
 // TaskCategoryRegistryProvider provides an immutable tasks.TaskCategoryRegistry to the server, which is intended to be
