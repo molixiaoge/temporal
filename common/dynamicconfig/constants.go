@@ -99,6 +99,25 @@ values in system search attributes.`,
 query.`,
 	)
 
+	// FrontendAPIVariant selects which frontend API variant the
+	// frontend exposes at startup. Empty (default) registers stable
+	// WorkflowService only. A non-empty value (e.g. "ping", "tinker") looks
+	// up the named variant in the experimental registry and registers it
+	// IN PLACE OF stable WorkflowService at the same wire path; the variant
+	// delegates stable methods to the existing stable handler. Toggling
+	// requires a frontend restart.
+	//
+	// A variant name is only resolvable if the corresponding variant is
+	// compiled into the binary. If a non-empty value does not match a
+	// registered variant, Start() logs Fatal.
+	FrontendAPIVariant = NewGlobalStringSetting(
+		"frontend.apiVariant",
+		"",
+		`FrontendAPIVariant selects which frontend API variant the
+frontend exposes. Empty = stable only. See service/frontend/services/
+for the list of supported variants in this build.`,
+	)
+
 	HistoryArchivalState = NewGlobalStringSetting(
 		"system.historyArchivalState",
 		"", // actual default is from static config
